@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+   <link rel="stylesheet" type="text/css" href="/static/myapp/styles.css">
+</head>
+<body>
+   <div id="container">
+       <div id="A">
+           <div id="A-tags"></div>
+           <button id="A-create">+</button>
+           <div id="A-buttons"> <!-- 新增的div元素 -->
+               <button id="export-button">导出</button> <!-- 新增的导出按钮 -->
+               <button id="import-button">导入</button> <!-- 新增的导入按钮 -->
+               <button id="save-button">保存</button> <!-- 新增的保存按钮 -->
+               <button id="delete-button">删除</button> <!-- 新增的删除按钮 -->
+           </div>
+       </div>
+       <div id="B">
+           <div id="B-tags"></div>
+           <button id="B-create">+</button>
+           <div id="B-fixed-tag" style="display: flex; align-items: center;">目录：共<input id="chapter-count" type="number" min="1" max="10000" value="0" style="width: 50px; height: 20px; margin: 0 5px;">章节</div> <!-- 修改了这一行 -->
+           <div id="B-chapters"></div>
+           <button id="B-create-2">+</button>
+       </div>
+       <div id="C">
+           <div id="C-tabs" style="display: none;">
+               <span class="C-tab">characters</span>
+               <span class="C-tab">background</span>
+               <span class="C-tab">structure</span>
+               <span class="C-tab">Conflict</span>
+               <span class="C-tab">theme</span>
+               <span class="C-tab">text</span>
+           </div>
+           <textarea id="C-editor"></textarea>
+       </div>
+       <div id="D">
+           <div id="chat-content"></div>
+           <div id="D-input">
+               <textarea id="chat-input"></textarea>
+               <button id="send-button">发送</button>
+           </div>
+       </div>
+   </div>
+   <script src="/static/myapp/main.js"></script>
+</body>
+</html>
