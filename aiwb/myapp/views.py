@@ -2,9 +2,11 @@ from django.http import JsonResponse
 from django.conf import settings
 from .models import Tag, TextContent
 from django.shortcuts import render
-from aiwb.markdown_parser import parse_markdown
-from django.http import HttpResponse
-from django.views.decorators.csrf import csrf_exempt
+from aiwb.markdown_parser import parse_markdown, generate_markdown
+#from django.http import HttpResponse
+#from django.views.decorators.csrf import csrf_exempt
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 import json
 import os
 import openai
@@ -34,19 +36,14 @@ def get_tags(request):
     return JsonResponse([tag.to_dict() for tag in tags], safe=False)
 
 def create_tag(request):
-    new_tag = Tag.objects.create(name=request.POST['name'])
-    return JsonResponse(new_tag.to_dict(), safe=False)
+    new_tag = Tag()
+    new_tag.create(request.POST['name'])
+    return JsonResponse(new_tag.unsaved_changes.get_changes(), safe=False)
 
 def edit_tag(request):
     tag = Tag.objects.get(id=request.POST['id'])
-    tag.name = request.POST['name']
-    tag.save()
-    return JsonResponse(tag.to_dict(), safe=False)
-
-def delete_tag(request):
-    tag = Tag.objects.get(id=request.POST['id'])
-    tag.delete()
-    return JsonResponse({'status': 'success'}, safe=False)
+    tag.rename(request.POST['name'])
+    return JsonResponse(tag.unsaved_changes.get_changes(), safe=False)
 
 def get_text_content(request):
     text_content = TextContent.objects.first()
@@ -58,100 +55,92 @@ def update_text_content(request):
     text_content.save()
     return JsonResponse(text_content.to_dict(), safe=False)
 
-@csrf_exempt
-def import_txt(request):
-    if request.method == 'POST':
-        file_content = json.loads(request.body)['content']
-        # TODO: Save the file content to the appropriate place
-        return JsonResponse({'status': 'success'}, safe=False)
-    else:
-        return JsonResponse({'error': 'Invalid request method'}, safe=False)
-
-@csrf_exempt
-def export_txt(request):
-    if request.method == 'POST':
-        tag = json.loads(request.body)['tag']
-        # TODO: Get the content associated with the tag
-        content = 'This is a mock content.'
-        response = HttpResponse(content, content_type='text/plain')
-        response['Content-Disposition'] = 'attachment; filename={}.txt'.format(tag)
-        return response
-    else:
-        return JsonResponse({'error': 'Invalid request method'}, safe=False)
-
-@csrf_exempt
-def save_tag(request):
+#@csrf_exempt
+def create_txt_for_primary_tag(request):
+    print("Received a request in create_txt_for_primary_tag")
     if request.method == 'POST':
         data = json.loads(request.body)
-        parent_tag_name = data['parent_tag_name']  # 新增
-        tag_name = data['tag_name']  # 修改
-        # 保存标签到TXT文件
-        file_path = os.path.join(settings.BASE_DIR, 'tags', parent_tag_name + '.txt')  # 修改
-        with open(file_path, 'a') as file:  # 修改
-            file.write(tag_name + '\n')  # 修改
+        print(f"Request body: {data}")  # Add this line
+        tag_name = data.get('tag_name')
+        print(f"Tag name: {tag_name}")  # Add this line
+        file_name = f"{tag_name}.txt"
+        file_path = os.path.join('database', file_name)  # Change this line
+        print(f"File path: {file_path}")  # Add this line
+        print(f"Default storage location: {default_storage.location}")  # Add this line
+        if not default_storage.exists(file_path):
+            default_storage.save(file_path, ContentFile(""))
         return JsonResponse({'status': 'success'}, safe=False)
     else:
         return JsonResponse({'error': 'Invalid request method'}, safe=False)
-@csrf_exempt
-def delete_tag(request):
-    if request.method == 'POST':
-        tag = json.loads(request.body)['tag']
-        # TODO: Delete the tag
-        return JsonResponse({'status': 'success'}, safe=False)
-    else:
-        return JsonResponse({'error': 'Invalid request method'},False)
+
 
 # 新增的函数
 def import_txt(request):
     file_path = request.POST['file_path']
     if not os.path.exists(file_path):
         return JsonResponse({'error': 'File does not exist'}, safe=False)
-    with open(file_path, 'r') as file:
-        content = file.read()
-    data = parse_markdown(content)
-    # 保存数据到数据库或其他地方
-    # ...
+    content = read_txt_file(file_path)  # 使用read_txt_file函数读取TXT文件的内容
+    data = parse_markdown(content)  # 使用parse_markdown函数解析TXT文件的内容
+    for book, book_data in data.items():
+        for tag_name, tag_data in book_data.items():
+            tag, created = Tag.objects.get_or_create(name=tag_name)
+            for chapter_name, chapter_data in tag_data.items():
+                for section_name, section_data in chapter_data.items():
+                    for tab_name, tab_data in section_data.items():
+                        TextContent.objects.update_or_create(
+                            tag=tag,
+                            chapter=chapter_name,
+                            section=section_name,
+                            tab=tab_name,
+                            defaults={'content': tab_data}
+                        )
+    return JsonResponse({'status': 'success'}, safe=False)
+
 
 def export_txt(request):
     tag_id = request.POST['tag_id']
-    # 从数据库或其他地方获取数据
-    # ...
-    content = "# Book: " + data['Book'] + "\n"
-    for tag in data['Tags']:
-        content += "## Custom Tag: " + tag['name'] + "\n"
-        for chapter in tag['Chapters']:
-            content += "### Chapter: " + chapter['name'] + "\n"
-            for section in chapter['Sections']:
-                content += "#### Section: " + section['name'] + "\n"
-                content += section['content'] + "\n"
+    tag = Tag.objects.get(id=tag_id)
+    data = {
+        'Book': tag.name,
+        'Tags': []
+    }
+    text_contents = TextContent.objects.filter(tag=tag)
+    for text_content in text_contents:
+        data['Tags'].append({
+            'name': text_content.chapter,
+            'Chapters': [
+                {
+                    'name': text_content.section,
+                    'Sections': [
+                        {
+                            'name': text_content.tab,
+                            'content': text_content.content
+                        }
+                    ]
+                }
+            ]
+        })
+    content = generate_markdown(data)  # 使用generate_markdown函数生成Markdown内容
     file_path = os.path.join(settings.BASE_DIR, 'export', tag_id + '.txt')
-    if not os.path.exists(file_path):
-        return JsonResponse({'error': 'File does not exist'}, safe=False)
-    with open(file_path, 'w') as file:
-        file.write(content)
+    write_txt_file(file_path, content)  # 使用write_txt_file函数将Markdown内容写入到TXT文件中
     return JsonResponse({'file_path': file_path}, safe=False)
 
 def save_tag(request):
     tag_id = request.POST['tag_id']
     tag_content = request.POST['tag_content']
-    # 保存标签到TXT文件
-    file_path = os.path.join(settings.BASE_DIR, 'tags', tag_id + '.txt')
-    with open(file_path, 'w') as file:
-        file.write(tag_content)
+    tag = Tag.objects.get(id=tag_id)
+    text_content = TextContent.objects.get(tag=tag)
+    text_content.content = tag_content
+    text_content.save()
     return JsonResponse({'status': 'success'}, safe=False)
 
 def delete_tag(request):
     tag_id = request.POST['tag_id']
-    # 删除TXT文件
-    file_path = os.path.join(settings.BASE_DIR, 'tags', tag_id + '.txt')
-    if os.path.exists(file_path):
-        os.remove(file_path)
-    return JsonResponse({'status': 'success'}, safe=False)
+    tag = Tag.objects.get(id=tag_id)
+    tag.delete()
+    return JsonResponse(tag.unsaved_changes.get_changes(), safe=False)
 
-# 新增的代码
-def create_txt_for_primary_tag(request):
-    if request.method == 'POST':
-        tag_name = request.POST['tag_name']
-        # 在这里创建TXT文件
-        # ...
-        return JsonResponse({'status': 'success'})
+def get_primary_tags(request):
+    # Replace this with your actual data
+    data = {'tags': ['tag1', 'tag2', 'tag3']}
+    return JsonResponse(data)

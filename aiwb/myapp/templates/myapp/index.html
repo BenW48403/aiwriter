@@ -1,24 +1,28 @@
 <!DOCTYPE html>
 <html>
 <head>
-   <link rel="stylesheet" type="text/css" href="/static/myapp/styles.css">
+    <link rel="stylesheet" type="text/css" href="/static/myapp/styles.css">
+    <!-- 在这里添加一个meta标签来存储CSRF token -->
+    <meta name="csrf-token" content="{{ csrf_token }}">
 </head>
 <body>
    <div id="container">
        <div id="A">
            <div id="A-tags"></div>
            <button id="A-create">+</button>
-           <div id="A-buttons"> <!-- 新增的div元素 -->
-               <button id="export-button">导出</button> <!-- 新增的导出按钮 -->
-               <button id="import-button">导入</button> <!-- 新增的导入按钮 -->
-               <button id="save-button">保存</button> <!-- 新增的保存按钮 -->
-               <button id="delete-button">删除</button> <!-- 新增的删除按钮 -->
+           <div id="A-buttons">
+               <button id="export-button">导出</button>
+               <button id="import-button">导入</button>
+               <input type="file" id="import-file" style="display: none;"> <!-- 新增的文件输入元素 -->
+               <button id="save-button">保存</button>
+               <button id="delete-button">删除</button>
            </div>
+           <div id="unsaved-changes"></div> <!-- 新增的元素，用于显示未保存的更改 -->
        </div>
        <div id="B">
            <div id="B-tags"></div>
            <button id="B-create">+</button>
-           <div id="B-fixed-tag" style="display: flex; align-items: center;">目录：共<input id="chapter-count" type="number" min="1" max="10000" value="0" style="width: 50px; height: 20px; margin: 0 5px;">章节</div> <!-- 修改了这一行 -->
+           <div id="B-fixed-tag" style="display: flex; align-items: center;">目录：共<input id="chapter-count" type="number" min="1" max="10000" value="0" style="width: 50px; height: 20px; margin: 0 5px;">章节</div>
            <div id="B-chapters"></div>
            <button id="B-create-2">+</button>
        </div>

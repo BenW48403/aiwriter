@@ -38,6 +38,7 @@ def parse_markdown(content):
     current_tag = None
     current_chapter = None
     current_section = None
+    current_tab = None
     for line in lines:
         if line.startswith('# Book: '):
             data['Book'] = line[8:]
@@ -59,11 +60,18 @@ def parse_markdown(content):
             if current_section is not None:
                 raise ValueError('Nested sections are not allowed')
             current_section = line[5:]
-            data['Custom Tags'][current_tag]['Chapters'][current_chapter][current_section] = ''
-        else:
+            data['Custom Tags'][current_tag]['Chapters'][current_chapter][current_section] = {}
+        elif line.startswith('##### '): # 新增的代码
             if current_section is None:
-                raise ValueError('Content outside of a section')
-            data['Custom Tags'][current_tag]['Chapters'][current_chapter][current_section] += line
+                raise ValueError('Tab outside of a section')
+            if current_tab is not None:
+                raise ValueError('Nested tabs are not allowed')
+            current_tab = line[6:]
+            data['Custom Tags'][current_tag]['Chapters'][current_chapter][current_section][current_tab] = ''
+        else:
+            if current_tab is None: # 修改的代码
+                raise ValueError('Content outside of a tab')
+            data['Custom Tags'][current_tag]['Chapters'][current_chapter][current_section][current_tab] += line
 
     # 在解析Markdown内容之后创建TXT文件
     with open(os.path.join(DATABASE_PATH, data['Book'] + '.txt'), 'w') as f:
@@ -79,5 +87,8 @@ def generate_markdown(data):
         for chapter, chapter_data in tag_data.get('Chapters', {}).items():
             content += '### Chapter: ' + chapter + '\n'
             for section, section_data in chapter_data.items():
-                content += '#### ' + section + '\n' + section_data + '\n'
+                content += '#### ' + section + '\n'
+                for tab, tab_data in section_data.items(): # 新增的代码
+                    content += '##### ' + tab + '\n' + tab_data + '\n' # 新增的代码
     return content
+
